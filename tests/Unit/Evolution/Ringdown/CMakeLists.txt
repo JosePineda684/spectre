@@ -5,6 +5,7 @@ set(LIBRARY "Test_Ringdown")
 
 set(LIBRARY_SOURCES
   Test_StrahlkorperCoefsAndCenters.cpp
+  Test_MinimumAhCExcisionRadius.cpp
   )
 
 add_test_library(${LIBRARY} "${LIBRARY_SOURCES}")
