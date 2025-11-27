@@ -363,14 +363,16 @@ def inspiral_parameters_spec(
     x_B = id_params["ID_cB"][0]
 
     params = {
+        "TargetParams": "",
+        "IdFromEvolution": 0,
         # Initial data files
         "SpecDataDirectory": str(Path(id_run_dir).resolve()),
         # Domain geometry
         # SpEC excision in ID_Params.perl is 0.89 * horizon radius, but
         # usually you want to excise less than the maximum. Here use 6% larger,
         # or about 0.9434 * horizon radius.
-        "ExcisionRadiusA": id_params["ID_rExcA"] * 1.06,
-        "ExcisionRadiusB": id_params["ID_rExcB"] * 1.06,
+        "ExcisionRadiusA": id_params["ID_rExcA"],
+        "ExcisionRadiusB": id_params["ID_rExcB"],
         "ObjectAOuterRadius": 0.8 * initial_separation * mass_right,
         "ObjectBOuterRadius": 0.8 * initial_separation * mass_left,
         "XCoordA": x_A,
