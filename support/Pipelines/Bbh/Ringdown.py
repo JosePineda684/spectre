@@ -65,7 +65,10 @@ def ringdown_parameters(
         "IdFileGlobSubgroup": fot_vol_subfile,
         # Store target parameters in the input file
         "TargetParams": yaml.safe_dump(
-            {"TargetParams": inspiral_metadata["TargetParams"]}
+            {
+                "TargetParams": ""
+            }  # As of now (12/1/2025), TargetParams is not compatible with spec
+            # initial data.
         ).strip(),
     }
 
