@@ -93,8 +93,8 @@ void test_filter_vs_transforms(const size_t ell_max,
   } else {
     ylm::TensorYlm::fill_cart_to_sphere<typename TensorType::structure>(
         make_not_null(&cart_to_sphere), ell_max);
-    cart_to_sphere.increment_multiply_on_right(make_not_null(&b_span), 0,
-                                               a_span, 0);
+    cart_to_sphere.increment_multiply_on_right(make_not_null(&b_span), 0, 1,
+                                               a_span, 0, 1);
   }
 
   // Apply the filter to B.
@@ -134,8 +134,8 @@ void test_filter_vs_transforms(const size_t ell_max,
   } else {
     ylm::TensorYlm::fill_sphere_to_cart<typename TensorType::structure>(
         make_not_null(&sphere_to_cart), ell_max);
-    sphere_to_cart.increment_multiply_on_right(make_not_null(&c_span), 0,
-                                               b_span, 0);
+    sphere_to_cart.increment_multiply_on_right(make_not_null(&c_span), 0, 1,
+                                               b_span, 0, 1);
   }
 
   // Apply the filter to A directly, output into D.
@@ -147,8 +147,8 @@ void test_filter_vs_transforms(const size_t ell_max,
   ylm::TensorYlm::fill_filter<typename TensorType::structure>(
       make_not_null(&filter_matrix), ell_max, number_of_ell_modes_to_kill,
       half_power);
-  filter_matrix.increment_multiply_on_right(make_not_null(&d_span), 0, a_span,
-                                            0);
+  filter_matrix.increment_multiply_on_right(make_not_null(&d_span), 0, 1,
+                                            a_span, 0, 1);
 
   // C should equal D.
   const auto& d_vector = get<MyTag<TensorType>>(D);
@@ -1168,6 +1168,39 @@ void test_tensorylm_filter_vs_spec(const size_t ell_max,
           approx(spec_matrix_elements[i]));
   }
 }
+
+void test(const std::optional<size_t>& half_power) {
+  const size_t ell_max = 8;
+  const size_t num_to_kill = 4;
+
+  test_tensorylm_filter_vs_spec<typename tnsr::i<DataVector, 3>::structure,
+                                SimpleSparseMatrix>(ell_max, num_to_kill,
+                                                    half_power);
+  test_tensorylm_filter_vs_spec<typename tnsr::ii<DataVector, 3>::structure,
+                                SimpleSparseMatrix>(ell_max, num_to_kill,
+                                                    half_power);
+  test_tensorylm_filter_vs_spec<typename tnsr::ij<DataVector, 3>::structure,
+                                SimpleSparseMatrix>(ell_max, num_to_kill,
+                                                    half_power);
+  test_tensorylm_filter_vs_spec<typename tnsr::ijj<DataVector, 3>::structure,
+                                SimpleSparseMatrix>(ell_max, num_to_kill,
+                                                    half_power);
+  test_tensorylm_filter_vs_spec<typename tnsr::ijk<DataVector, 3>::structure,
+                                SimpleSparseMatrix>(ell_max, num_to_kill,
+                                                    half_power);
+  test_filter_vs_transforms<typename tnsr::i<DataVector, 3>>(
+      ell_max, num_to_kill, half_power);
+  test_filter_vs_transforms<typename tnsr::ii<DataVector, 3>>(
+      ell_max, num_to_kill, half_power);
+  test_filter_vs_transforms<typename tnsr::ij<DataVector, 3>>(
+      ell_max, num_to_kill, half_power);
+  test_filter_vs_transforms<typename tnsr::ijj<DataVector, 3>>(
+      ell_max, num_to_kill, half_power);
+  test_filter_vs_transforms<typename tnsr::ijk<DataVector, 3>>(
+      ell_max, num_to_kill, half_power);
+  test_filter_vs_transforms<Scalar<DataVector>>(ell_max, num_to_kill,
+                                                half_power);
+}
 }  // namespace
 
 // For debug builds, test_tensorylm_filter_vs_spec is slow even for
@@ -1175,39 +1208,16 @@ void test_tensorylm_filter_vs_spec(const size_t ell_max,
 // timeout to 120.  Release builds are still under 10 seconds (barely).  The
 // function test_filter_vs_transforms is much slower than
 // test_tensorylm_filter_vs_spec, so we increase the timeout to 360.
-// [[TimeOut, 360]]
-SPECTRE_TEST_CASE("Unit.SphericalHarmonics.TensorYlmFilter",
-                  "[NumericalAlgorithms][Unit]") {
-  const size_t ell_max = 8;
-  const size_t num_to_kill = 4;
+// Test then split in half to allow running in parallel.
 
-  for (auto half_power : {std::optional<size_t>(), std::optional<size_t>(28)}) {
-    test_tensorylm_filter_vs_spec<typename tnsr::i<DataVector, 3>::structure,
-                                  SimpleSparseMatrix>(ell_max, num_to_kill,
-                                                      half_power);
-    test_tensorylm_filter_vs_spec<typename tnsr::ii<DataVector, 3>::structure,
-                                  SimpleSparseMatrix>(ell_max, num_to_kill,
-                                                      half_power);
-    test_tensorylm_filter_vs_spec<typename tnsr::ij<DataVector, 3>::structure,
-                                  SimpleSparseMatrix>(ell_max, num_to_kill,
-                                                      half_power);
-    test_tensorylm_filter_vs_spec<typename tnsr::ijj<DataVector, 3>::structure,
-                                  SimpleSparseMatrix>(ell_max, num_to_kill,
-                                                      half_power);
-    test_tensorylm_filter_vs_spec<typename tnsr::ijk<DataVector, 3>::structure,
-                                  SimpleSparseMatrix>(ell_max, num_to_kill,
-                                                      half_power);
-    test_filter_vs_transforms<typename tnsr::i<DataVector, 3>>(
-        ell_max, num_to_kill, half_power);
-    test_filter_vs_transforms<typename tnsr::ii<DataVector, 3>>(
-        ell_max, num_to_kill, half_power);
-    test_filter_vs_transforms<typename tnsr::ij<DataVector, 3>>(
-        ell_max, num_to_kill, half_power);
-    test_filter_vs_transforms<typename tnsr::ijj<DataVector, 3>>(
-        ell_max, num_to_kill, half_power);
-    test_filter_vs_transforms<typename tnsr::ijk<DataVector, 3>>(
-        ell_max, num_to_kill, half_power);
-    test_filter_vs_transforms<Scalar<DataVector>>(ell_max, num_to_kill,
-                                                  half_power);
-  }
+// [[TimeOut, 180]]
+SPECTRE_TEST_CASE("Unit.SphericalHarmonics.TensorYlmFilter1",
+                  "[NumericalAlgorithms][Unit]") {
+  test(std::optional<size_t>());
+}
+
+// [[TimeOut, 180]]
+SPECTRE_TEST_CASE("Unit.SphericalHarmonics.TensorYlmFilter2",
+                  "[NumericalAlgorithms][Unit]") {
+  test(std::optional<size_t>(28));
 }
