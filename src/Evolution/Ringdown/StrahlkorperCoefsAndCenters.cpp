@@ -1,6 +1,6 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
-#include "Evolution/Ringdown/StrahlkorperCoefsInRingdownDistortedFrame.hpp"
+#include "Evolution/Ringdown/StrahlkorperCoefsAndCenters.hpp"
 
 #include <array>
 #include <cstddef>
@@ -9,19 +9,28 @@
 
 #include "DataStructures/Matrix.hpp"
 #include "Domain/CoordinateMaps/Distribution.hpp"
+#include "Domain/CoordsToDifferentFrame.hpp"
 #include "Domain/Creators/Sphere.hpp"
 #include "Domain/Creators/TimeDependentOptions/ExpansionMap.hpp"
+#include "Domain/Creators/TimeDependentOptions/FromVolumeFile.hpp"
 #include "Domain/Creators/TimeDependentOptions/RotationMap.hpp"
 #include "Domain/Creators/TimeDependentOptions/Sphere.hpp"
+#include "Domain/Creators/TimeDependentOptions/TranslationMap.hpp"
 #include "Domain/StrahlkorperTransformations.hpp"
 #include "IO/H5/Dat.hpp"
 #include "IO/H5/File.hpp"
+#include "IO/H5/VolumeData.hpp"
+#include "NumericalAlgorithms/SphericalHarmonics/ChangeCenterOfStrahlkorper.hpp"
 #include "NumericalAlgorithms/SphericalHarmonics/IO/ReadSurfaceYlm.hpp"
 #include "NumericalAlgorithms/SphericalHarmonics/Strahlkorper.hpp"
 #include "Utilities/Gsl.hpp"
+#include "Utilities/Serialization/Serialize.hpp"
 
 namespace evolution::Ringdown {
-std::vector<DataVector> strahlkorper_coefs_in_ringdown_distorted_frame(
+std::pair<std::vector<DataVector>, std::vector<std::array<double, 3>>>
+strahlkorper_coefs_and_centers(
+    const std::string& path_to_volume_data,
+    const std::string& volume_subfile_name,
     const std::string& path_to_horizons_h5,
     const std::string& surface_subfile_name,
     const size_t requested_number_of_times_from_end, const double match_time,
@@ -50,58 +59,60 @@ std::vector<DataVector> strahlkorper_coefs_in_ringdown_distorted_frame(
       ahc_times.push_back(coefs_for_times(i, 0));
     }
   }
+
   // Create a time-dependent domain; only the the time-dependent map options
   // matter; the domain is just a spherical shell with inner and outer
   // radii chosen so any conceivable common horizon will fit between them.
   const auto expansion_map_options =
       exp_func_and_2_derivs.has_value()
-          ? domain::creators::time_dependent_options::
-                ExpansionMapOptions<true>{exp_func_and_2_derivs.value(),
-                                    settling_timescale,
-                                    exp_outer_bdry_func_and_2_derivs.value(),
-                                    settling_timescale}
+          ? domain::creators::time_dependent_options::ExpansionMapOptions<
+                true>{exp_func_and_2_derivs.value(), settling_timescale,
+                      exp_outer_bdry_func_and_2_derivs.value(),
+                      settling_timescale}
           : std::optional<domain::creators::time_dependent_options::
                               ExpansionMapOptions<true>>{};
   const auto rotation_map_options =
       rot_func_and_2_derivs.has_value()
-          ? domain::creators::time_dependent_options::
-                RotationMapOptions<true>{rot_func_and_2_derivs.value(),
-                                   settling_timescale}
+          ? domain::creators::time_dependent_options::RotationMapOptions<
+                true>{rot_func_and_2_derivs.value(), settling_timescale}
           : std::optional<domain::creators::time_dependent_options::
                               RotationMapOptions<true>>{};
-  const auto translation_map_options =
+  const auto& translation_fot_from_volume =
       trans_func_and_2_derivs.has_value()
-          ? domain::creators::sphere::TimeDependentMapOptions::
-                TranslationMapOptions{trans_func_and_2_derivs.value()}
-          : std::optional<domain::creators::sphere::TimeDependentMapOptions::
-                              TranslationMapOptions>{};
+          ? domain::creators::time_dependent_options::FromVolumeFile(
+                path_to_volume_data, volume_subfile_name, true)
+          : std::optional<
+                domain::creators::time_dependent_options::FromVolumeFile>{};
   const domain::creators::sphere::TimeDependentMapOptions
       time_dependent_map_options{match_time,
                                  std::nullopt,
                                  rotation_map_options,
                                  expansion_map_options,
-                                 translation_map_options,
+                                 translation_fot_from_volume,
                                  true};
   const domain::creators::Sphere domain_creator{
-      0.01,
+      // Inner radius and outer radius chosen so that every point on a
+      // strahlkorper transformed to this domain will be mapped to a block.
+      1e-16,
       200.0,
       // nullptr because no boundary condition
       domain::creators::Sphere::Excision{nullptr},
+      // H/P refinement doesn't matter on this domain.
       static_cast<size_t>(0),
       static_cast<size_t>(5),
       false,
       std::nullopt,
-      {100.0},
+      // Radial partition used in current ringdowns
+      {50.0},
       domain::CoordinateMaps::Distribution::Linear,
       ShellWedges::All,
       time_dependent_map_options};
-
-  const auto temporary_domain = domain_creator.create_domain();
-  const auto functions_of_time = domain_creator.functions_of_time();
-
+  const auto ringdown_domain = domain_creator.create_domain();
+  const auto ringdown_functions_of_time = domain_creator.functions_of_time();
   // Loop over the selected horizons, transforming each to the
   // ringdown distorted frame
   std::vector<DataVector> ahc_ringdown_distorted_coefs{};
+  std::vector<std::array<double, 3>> ahc_inertial_centers{};
   // Here we transform the inertial strahlkorper into the ringdown distorted
   // frame. In order to do this, the inertial coords of the strahlkorper are
   // mapped to the logical frame to determine which block map to use, and then
@@ -114,14 +125,38 @@ std::vector<DataVector> strahlkorper_coefs_in_ringdown_distorted_frame(
   // true ringdown distorted frame we are after. This is why we map the
   // strahlkorper into the "grid" frame instead of the "distorted" frame. It is
   // a simplification to avoid an unnecessary identity shape map.
-  ylm::Strahlkorper<Frame::Grid> current_ahc;
+  ylm::Strahlkorper<Frame::Grid> distorted_ahc;
   for (size_t i = 0; i < requested_number_of_times_from_end; ++i) {
-    strahlkorper_in_different_frame(
-        make_not_null(&current_ahc), gsl::at(ahc_inertial_h5, i),
-        temporary_domain, functions_of_time, gsl::at(ahc_times, i));
-    ahc_ringdown_distorted_coefs.push_back(current_ahc.coefficients());
+    if (gsl::at(ahc_times, i) <= match_time) {
+      strahlkorper_in_different_frame(
+          make_not_null(&distorted_ahc), gsl::at(ahc_inertial_h5, i),
+          ringdown_domain, ringdown_functions_of_time, gsl::at(ahc_times, i));
+      // Relative tolerance is set to the value used in SpEC
+      ylm::change_expansion_center_of_strahlkorper_to_physical(
+          make_not_null(&distorted_ahc), 1e-7);
+      ahc_ringdown_distorted_coefs.push_back(distorted_ahc.coefficients());
+
+      tnsr::I<DataVector, 3, ::Frame::Grid> grid_center_point{
+          DataVector{1, 0.0}};
+      grid_center_point[0] = distorted_ahc.expansion_center()[0];
+      grid_center_point[1] = distorted_ahc.expansion_center()[1];
+      grid_center_point[2] = distorted_ahc.expansion_center()[2];
+      tnsr::I<DataVector, 3, ::Frame::Inertial> inertial_center_point{
+          DataVector{1, 0.0}};
+      // The center point is mapped to the ringdown-inertial-frame so that the
+      // geometric center of AhC accounts for the inspiral's rotation, scaling
+      // and translation. This ensures that the center of the excision is at the
+      // correct location at the match time
+      coords_to_different_frame(
+          make_not_null(&inertial_center_point), grid_center_point,
+          ringdown_domain, ringdown_functions_of_time, gsl::at(ahc_times, i));
+
+      ahc_inertial_centers.push_back(std::array<double, 3>{
+          get<0>(inertial_center_point)[0], get<1>(inertial_center_point)[0],
+          get<2>(inertial_center_point)[0]});
+    }
   }
 
-  return ahc_ringdown_distorted_coefs;
+  return std::pair{ahc_ringdown_distorted_coefs, ahc_inertial_centers};
 }
 }  // namespace evolution::Ringdown

@@ -65,20 +65,23 @@ def ringdown_parameters(
         "IdFileGlobSubgroup": fot_vol_subfile,
         # Store target parameters in the input file
         "TargetParams": yaml.safe_dump(
-            {"TargetParams": inspiral_metadata["TargetParams"]}
+            {
+                "TargetParams": ""
+            }  # As of now (12/1/2025), TargetParams is not compatible with spec
+            # initial data.
         ).strip(),
     }
 
 
 def start_ringdown(
     inspiral_run_dir: Union[str, Path],
-    number_of_ahc_finds_for_fit: int,
-    match_time: float,
-    settling_timescale: float,
-    zero_coefs_eps: float,
-    lev: Optional[int],
-    refinement_level: Optional[int],
-    polynomial_order: Optional[int],
+    lev: Optional[int] = None,
+    refinement_level: Optional[int] = None,
+    polynomial_order: Optional[int] = None,
+    number_of_ahc_finds_for_fit: int = 10,
+    match_time: float = None,
+    settling_timescale: float = 10.0,
+    zero_coefs_eps: float = None,
     inspiral_input_file: Optional[Union[str, Path]] = None,
     ahc_reductions_path: Optional[Union[str, Path]] = None,
     ahc_subfile: str = "ObservationAhC_Ylm",
@@ -141,12 +144,12 @@ def start_ringdown(
     logger.warning(
         "The BBH pipeline is still experimental. Please review the"
         " generated input files. In particular, the ringdown BBH pipline has"
-        " been tested for a q=1, spin=0 quasicircular inspiral but does not"
-        " yet support accounting for a nonzero translation map in the inspiral"
-        " (necessary for unequal-mass mergers.)"
+        " been tested for q=1, q=2, spin=0 inspirals but does not"
+        " yet support choosing an excision radius automatically."
     )
     # Determine ringdown parameters from inspiral
     # Resolve and set correct files/paths.
+    inspiral_run_dir = Path(inspiral_run_dir).resolve()
     if inspiral_input_file is None:
         inspiral_input_file = inspiral_run_dir / "Inspiral.yaml"
 
@@ -237,22 +240,25 @@ def start_ringdown(
             [0.0, 0.0, 0.0, 0.0],
         ]
     evaluated_fot_dict["Expansion"] = [1.0, 0.0, 0.0]
-    evaluated_fot_dict["Translation"] = [
-        [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0],
-    ]
+    # This was added so we don't try to read in translation function of time
+    # history if there was no translation map in the inspiral.
+    if "Translation" not in evaluated_fot_dict:
+        evaluated_fot_dict["Translation"] = None
 
-    ringdown_ylm_coefs, ringdown_ylm_legend = (
-        compute_ahc_coefs_in_ringdown_distorted_frame(
-            str(ahc_reductions_path),
-            ahc_subfile,
-            evaluated_fot_dict,
-            number_of_ahc_finds_for_fit,
-            match_time,
-            settling_timescale,
-            zero_coefs_eps,
-        )
+    (
+        ringdown_ylm_coefs,
+        ringdown_ylm_legend,
+        ahc_translation_fot,
+    ) = compute_ahc_coefs_in_ringdown_distorted_frame(
+        fot_vol_h5_path,
+        fot_vol_subfile,
+        str(ahc_reductions_path),
+        ahc_subfile,
+        evaluated_fot_dict,
+        number_of_ahc_finds_for_fit,
+        match_time,
+        settling_timescale,
+        zero_coefs_eps,
     )
 
     # Setting up and writing the distorted coefficients output file.
@@ -308,7 +314,7 @@ def start_ringdown(
         width=float("inf"),
     ).strip()
     ringdown_params["Translation"] = yaml.safe_dump(
-        evaluated_fot_dict["Translation"],
+        ahc_translation_fot,
         default_flow_style=True,
         width=float("inf"),
     ).strip()
