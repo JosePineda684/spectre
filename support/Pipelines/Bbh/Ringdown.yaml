@@ -350,7 +350,7 @@ ApparentHorizons:
 InterpolationTargets:
   BondiSachsInterpolation:
     LMax: 16
-    Radius: [100, 150, 200]
+    Radius: [214, 403, 591]
     Center: [0, 0, 0]
     AngularOrdering: Cce
   ExcisionBoundary: &ExBdry
