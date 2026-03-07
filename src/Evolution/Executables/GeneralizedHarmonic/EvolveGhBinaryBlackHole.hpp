@@ -51,6 +51,7 @@
 #include "Evolution/Systems/GeneralizedHarmonic/Bbh/CompletionSingleton.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Bbh/Events/CheckConstraintThresholds.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/Bbh/PhaseControl/CheckpointAndExitIfComplete.hpp"
+#include "Evolution/Systems/GeneralizedHarmonic/ApplyTensorYlmFilter.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/Bjorhus.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/DemandOutgoingCharSpeeds.hpp"
 #include "Evolution/Systems/GeneralizedHarmonic/BoundaryConditions/DirichletMinkowski.hpp"
@@ -601,7 +602,8 @@ struct EvolutionMetavars {
           Filters::Exponential<0>,
           tmpl::list<gr::Tags::SpacetimeMetric<DataVector, volume_dim>,
                      gh::Tags::Pi<DataVector, volume_dim>,
-                     gh::Tags::Phi<DataVector, volume_dim>>>>;
+                     gh::Tags::Phi<DataVector, volume_dim>>>,
+      gh::Actions::ApplyTensorYlmFilter>;
 
   using initialization_actions = tmpl::list<
       Initialization::Actions::InitializeItems<
@@ -640,9 +642,16 @@ struct EvolutionMetavars {
                          Parallel::Actions::TerminatePhase>>,
           Parallel::PhaseActions<
               Parallel::Phase::ImportInitialData,
-              tmpl::list<gh::Actions::SetInitialData,
-                         gh::Actions::ReceiveNumericInitialData,
-                         Parallel::Actions::TerminatePhase>>,
+              tmpl::list<
+                  gh::Actions::SetInitialData,
+                  gh::Actions::ReceiveNumericInitialData,
+                  dg::Actions::Filter<
+                      Filters::Exponential<0>,
+                      tmpl::list<gr::Tags::SpacetimeMetric<DataVector, 3>,
+                                 gh::Tags::Pi<DataVector, 3>,
+                                 gh::Tags::Phi<DataVector, 3>>>,
+                  gh::Actions::ApplyTensorYlmFilter,
+                  Parallel::Actions::TerminatePhase>>,
           Parallel::PhaseActions<
               Parallel::Phase::InitializeInitialDataDependentQuantities,
               initialize_initial_data_dependent_quantities_actions>,
