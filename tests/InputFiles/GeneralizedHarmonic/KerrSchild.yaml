@@ -125,6 +125,7 @@ EvolutionSystem:
         Center: [0.0, 0.0, 0.0]
 
 Filtering:
+<<<<<<< HEAD
   ExpFilter0:
     Alpha: 36.0
     HalfPower: 64
@@ -136,6 +137,13 @@ Filtering:
     Enable: true
     FilterEveryNSlabs: 1
     BlocksToFilter: All
+=======
+  FilterEvolvedVariables:
+    - ExponentialFilter:
+        Alpha: 36.0
+        HalfPower: 64
+        BlocksToFilter: All
+>>>>>>> 022cdfaa86 (Filtering: create filters from options, store in DataBox)
 
 SpatialDiscretization:
   BoundaryCorrection:

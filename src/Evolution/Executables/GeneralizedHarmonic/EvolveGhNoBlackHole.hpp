@@ -113,6 +113,8 @@ struct EvolutionMetavars
                                             typename system::variables_tag>,
         evolution::dg::Initialization::ProjectMortars<volume_dim,
                                                       local_time_stepping>,
+        dg::Actions::InitializeFilters<
+            typename gh_base::FilterEvolvedVariables>,
         Initialization::ProjectTimeStepperHistory<EvolutionMetavars>,
         evolution::Actions::ProjectRunEventsAndDenseTriggers,
         ::amr::projectors::DefaultInitialize<
@@ -125,8 +127,8 @@ struct EvolutionMetavars
             SelfStart::Tags::InitialValue<typename system::variables_tag>,
             SelfStart::Tags::InitialValue<Tags::TimeStep>>,
         ::amr::projectors::CopyFromCreatorOrLeaveAsIs<
-            Tags::ChangeSlabSize::NumberOfExpectedMessages,
-            Tags::ChangeSlabSize::NewSlabSize>>;
+            tmpl::list<Tags::ChangeSlabSize::NumberOfExpectedMessages,
+                       Tags::ChangeSlabSize::NewSlabSize>>>;
     static constexpr bool keep_coarse_grids = false;
     static constexpr bool p_refine_only_in_event = true;
   };

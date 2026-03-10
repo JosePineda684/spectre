@@ -519,8 +519,13 @@ struct EvolutionMetavars {
         tmpl::pair<
             gh::gauges::GaugeCondition,
             tmpl::list<gh::gauges::DampedHarmonic, gh::gauges::Harmonic>>,
+<<<<<<< HEAD
         tmpl::pair<MathFunction<1, Frame::Inertial>,
                    MathFunctions::all_math_functions<1, Frame::Inertial>>,
+=======
+        tmpl::pair<Filters::Filter,
+                   tmpl::list<Filters::Exponential<volume_dim>>>,
+>>>>>>> 022cdfaa86 (Filtering: create filters from options, store in DataBox)
         // Restrict to monotonic time steppers in LTS to avoid control
         // systems deadlocking.
         tmpl::pair<LtsTimeStepper, TimeSteppers::monotonic_lts_time_steppers>,
@@ -568,6 +573,8 @@ struct EvolutionMetavars {
                  Parallel::Phase::Evolve,
                  Parallel::Phase::Exit};
 
+  struct FilterEvolvedVariables {};
+
   using step_actions = tmpl::list<
       evolution::dg::Actions::ComputeTimeDerivative<
           volume_dim, system, AllStepChoosers, local_time_stepping,
@@ -598,18 +605,24 @@ struct EvolutionMetavars {
           local_time_stepping,
           Actions::MutateApply<evolution::dg::CleanMortarHistory<volume_dim>>,
           tmpl::list<>>,
+<<<<<<< HEAD
       dg::Actions::Filter<
           Filters::Exponential<0>,
           tmpl::list<gr::Tags::SpacetimeMetric<DataVector, volume_dim>,
                      gh::Tags::Pi<DataVector, volume_dim>,
                      gh::Tags::Phi<DataVector, volume_dim>>>,
       gh::Actions::ApplyTensorYlmFilter>;
+=======
+      dg::Actions::Filter<FilterEvolvedVariables,
+                          typename system::variables_tag::tags_list>>;
+>>>>>>> 022cdfaa86 (Filtering: create filters from options, store in DataBox)
 
   using initialization_actions = tmpl::list<
       Initialization::Actions::InitializeItems<
           Initialization::TimeStepping<EvolutionMetavars, TimeStepperBase>,
           evolution::dg::Initialization::Domain<EvolutionMetavars,
                                                 use_control_systems>,
+          dg::Actions::InitializeFilters<FilterEvolvedVariables>,
           ::amr::Initialization::Initialize<volume_dim, EvolutionMetavars>,
           Initialization::TimeStepperHistory<EvolutionMetavars>>,
       Initialization::Actions::NonconservativeSystem<system>,
@@ -721,6 +734,7 @@ struct EvolutionMetavars {
                                             typename system::variables_tag>,
         evolution::dg::Initialization::ProjectMortars<volume_dim,
                                                       local_time_stepping>,
+        dg::Actions::InitializeFilters<FilterEvolvedVariables>,
         Initialization::ProjectTimeStepperHistory<EvolutionMetavars>,
         evolution::Actions::ProjectRunEventsAndDenseTriggers,
         ::amr::projectors::DefaultInitialize<

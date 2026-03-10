@@ -125,7 +125,7 @@ void change_expansion_center_of_strahlkorper_to_physical(
   // In the random number tests, it never needed more than 7
   // iterations to converge to relative error of roundoff.  Allow 14
   // iterations to be safe.
-  const size_t maxiter = 14;
+  const size_t maxiter = 25;
   for (size_t iter = 0; iter < maxiter; ++iter) {
     const auto phys_center = strahlkorper->physical_center();
     const auto exp_center = strahlkorper->expansion_center();
