@@ -59,18 +59,18 @@ def combine_h5_dat(h5files, output, wipe_nonmonotonic_times, force):
                             f"CombineH5Dat: Dat file '{dat_file_key}'"
                             f" not found in input file '{input_file}'"
                         )
-                if wipe_nonmonotonic_times:
-                    data = out[dat_file_key][:]
-                    mask = np.zeros(len(data), dtype=bool)
-                    last_time = data[-1, 0]
-                    for i in range(len(data) - 2, -1, -1):
-                        current_time = data[i, 0]
-                        if current_time < last_time:
-                            mask[i] = True
-                            last_time = current_time
-                    wiped_data = data[mask]
-                    del out[dat_file_key]
-                    out.create_dataset(dat_file_key, data=wiped_data)
+                    if wipe_nonmonotonic_times:
+                        data = out[dat_file_key][:]
+                        mask = np.zeros(len(data), dtype=bool)
+                        last_time = data[-1, 0]
+                        for i in range(len(data) - 2, -1, -1):
+                            current_time = data[i, 0]
+                            if current_time < last_time:
+                                mask[i] = True
+                                last_time = current_time
+                        wiped_data = data[mask]
+                        del out[dat_file_key]
+                        out.create_dataset(dat_file_key, data=wiped_data)
 
 
 @click.command(name="combine-h5-dat", help=combine_h5_dat.__doc__)
