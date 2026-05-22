@@ -7,11 +7,12 @@ import shutil
 
 import click
 import h5py
+import numpy as np
 
 from spectre.IO.H5 import available_subfiles
 
 
-def combine_h5_dat(h5files, output, force):
+def combine_h5_dat(h5files, output, wipe_nonmonotonic_times, force):
     """Combines multiple HDF5 dat files
 
     This executable is used for combining a series of HDF5 files, each
@@ -24,6 +25,8 @@ def combine_h5_dat(h5files, output, force):
     Arguments:
       h5files: List of H5 dat files to join
       output: Output filename. An extension '.h5' will be added if not present.
+      wipe_nonmonotonic_times: If specified, wipe non-monotonically increasing
+       times in favor for later times from h5 file.
       force: If specified, overwrite output file if it already exists
     """
     # Copy first input file to output file
@@ -56,6 +59,18 @@ def combine_h5_dat(h5files, output, force):
                             f"CombineH5Dat: Dat file '{dat_file_key}'"
                             f" not found in input file '{input_file}'"
                         )
+                if wipe_nonmonotonic_times:
+                    data = out[dat_file_key][:]
+                    mask = np.zeros(len(data), dtype=bool)
+                    last_time = data[-1, 0]
+                    for i in range(len(data) - 2, -1, -1):
+                        current_time = data[i, 0]
+                        if current_time < last_time:
+                            mask[i] = True
+                            last_time = current_time
+                    wiped_data = data[mask]
+                    del out[dat_file_key]
+                    out.create_dataset(dat_file_key, data=wiped_data)
 
 
 @click.command(name="combine-h5-dat", help=combine_h5_dat.__doc__)
@@ -84,13 +99,24 @@ def combine_h5_dat(h5files, output, force):
     help="Combined output filename.",
 )
 @click.option(
+    "--wipe-nonmonotonic-times",
+    "-w",
+    is_flag=True,
+    help="Wipe non-monotonic times in favor for later times from h5 file.",
+)
+@click.option(
     "--force",
     "-f",
     is_flag=True,
     help="If the output file already exists, overwrite it.",
 )
 def combine_h5_dat_command(**kwargs):
-    combine_h5_dat(kwargs["h5files"], kwargs["output"], kwargs["force"])
+    combine_h5_dat(
+        kwargs["h5files"],
+        kwargs["output"],
+        kwargs["wipe_nonmonotonic_times"],
+        kwargs["force"],
+    )
 
 
 if __name__ == "__main__":
