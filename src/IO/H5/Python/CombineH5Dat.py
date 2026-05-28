@@ -19,9 +19,9 @@ def combine_h5_dat(h5files, output, force, remove_overlapping_segments):
     containing one or more dat files, into a single HDF5 file. A typical
     use case is to join dat-containing HDF5 files from different segments
     of a simulation, with each segment containing values of the dat files
-    during different time intervals. The executable is sensitive to order, thus
+    during different time intervals. The executable is sensitive to order, so
     if you aim to combine h5 files from different segments of a simulation,
-    verify that the order you combine is chronological to preserve time
+    verify that the order you combine is chronological to preserve relative time
     continuity.
 
     \f
@@ -29,10 +29,9 @@ def combine_h5_dat(h5files, output, force, remove_overlapping_segments):
       h5files: List of H5 dat files to join
       output: Output filename. An extension '.h5' will be added if not present.
       force: If specified, overwrite output file if it already exists.
-      wipe_nonmonotonic_times: If specified, remove non-monotonically increasing
-        times and data, preserving later times from h5 files. Verify h5 files
-        are ordered chronologically, otherwise the option will remove more data
-        than desired.
+      remove_overlapping_segments: If specified, remove data with overlapping
+        times, preserving later times from h5 files. Verify h5 files are ordered
+        correctly, otherwise the option will remove more data than desired.
     """
     # Copy first input file to output file
     if not output.endswith(".h5"):
@@ -40,13 +39,6 @@ def combine_h5_dat(h5files, output, force, remove_overlapping_segments):
     # If output file exists, exit unless the user specifies `--force`
     if os.path.exists(output) and not force:
         raise ValueError(f"File '{output}' exists; to overwrite, use --force")
-
-    # Draft of sorting before combining
-    # if remove_overlapping_segments:
-    #     for input in h5files:
-    #         with h5py.File(input_file,"r+") as input:
-    #             dat_file_keys = available_subfiles(out, extension=".dat")
-    #             for dat_file_key in dat_file_keys:
     shutil.copy(h5files[0], output)
 
     # Open the output file for appending
@@ -59,8 +51,11 @@ def combine_h5_dat(h5files, output, force, remove_overlapping_segments):
             with h5py.File(input_file, "r") as input:
                 for dat_file_key in dat_file_keys:
                     if dat_file_key in input.keys():
+                        # Sort dat files by time to guarantee each segment is
+                        # monotonically increasing since spectre does not do
+                        # this during simulations.
                         if remove_overlapping_segments:
-                            data_to_sort = input[dat_file_key]
+                            data_to_sort = np.asarray(input[dat_file_key])
                             # Assuming time is the first column in all dat files
                             time_order = np.argsort(data_to_sort[:, 0])
                             data_to_append = data_to_sort[time_order]
@@ -77,6 +72,8 @@ def combine_h5_dat(h5files, output, force, remove_overlapping_segments):
                             f"CombineH5Dat: Dat file '{dat_file_key}'"
                             f" not found in input file '{input_file}'"
                         )
+        # With sorted h5 files now combined, parse through the times of each dat
+        # file in reverse order and remove data if time not increasing.
         if remove_overlapping_segments:
             for dat_file_key in dat_file_keys:
                 data = out[dat_file_key][:]
@@ -84,12 +81,12 @@ def combine_h5_dat(h5files, output, force, remove_overlapping_segments):
                     raise ValueError(f"Dat file '{dat_file_key}' is empty")
                 mask = np.zeros(len(data), dtype=bool)
                 mask[-1] = True
-                last_time = data[-1, 0]
+                previous_time = data[-1, 0]
                 for i in range(len(data) - 2, -1, -1):
                     current_time = data[i, 0]
-                    if current_time < last_time:
+                    if current_time < previous_time:
                         mask[i] = True
-                        last_time = current_time
+                        previous_time = current_time
                 monotonic_data = data[mask]
                 out[dat_file_key].resize(monotonic_data.shape)
                 # Overwriting with monotonic data to preserve metadata
@@ -137,7 +134,7 @@ def combine_h5_dat_command(**kwargs):
         kwargs["h5files"],
         kwargs["output"],
         kwargs["force"],
-        kwargs["remover_overlapping_segments"],
+        kwargs["remove_overlapping_segments"],
     )
 
 
