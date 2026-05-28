@@ -12,7 +12,7 @@ import numpy as np
 from spectre.IO.H5 import available_subfiles
 
 
-def combine_h5_dat(h5files, output, force, wipe_nonmonotonic_times=False):
+def combine_h5_dat(h5files, output, force, remove_overlapping_segments):
     """Combines multiple HDF5 dat files
 
     This executable is used for combining a series of HDF5 files, each
@@ -40,6 +40,13 @@ def combine_h5_dat(h5files, output, force, wipe_nonmonotonic_times=False):
     # If output file exists, exit unless the user specifies `--force`
     if os.path.exists(output) and not force:
         raise ValueError(f"File '{output}' exists; to overwrite, use --force")
+
+    # Draft of sorting before combining
+    # if remove_overlapping_segments:
+    #     for input in h5files:
+    #         with h5py.File(input_file,"r+") as input:
+    #             dat_file_keys = available_subfiles(out, extension=".dat")
+    #             for dat_file_key in dat_file_keys:
     shutil.copy(h5files[0], output)
 
     # Open the output file for appending
@@ -52,7 +59,13 @@ def combine_h5_dat(h5files, output, force, wipe_nonmonotonic_times=False):
             with h5py.File(input_file, "r") as input:
                 for dat_file_key in dat_file_keys:
                     if dat_file_key in input.keys():
-                        data_to_append = input[dat_file_key]
+                        if remove_overlapping_segments:
+                            data_to_sort = input[dat_file_key]
+                            # Assuming time is the first column in all dat files
+                            time_order = np.argsort(data_to_sort[:, 0])
+                            data_to_append = data_to_sort[time_order]
+                        else:
+                            data_to_append = input[dat_file_key]
                         start_size = out[dat_file_key].shape[0]
                         append_size = input[dat_file_key].shape[0]
                         out[dat_file_key].resize(
@@ -64,7 +77,7 @@ def combine_h5_dat(h5files, output, force, wipe_nonmonotonic_times=False):
                             f"CombineH5Dat: Dat file '{dat_file_key}'"
                             f" not found in input file '{input_file}'"
                         )
-        if wipe_nonmonotonic_times:
+        if remove_overlapping_segments:
             for dat_file_key in dat_file_keys:
                 data = out[dat_file_key][:]
                 if len(data) == 0:
@@ -73,10 +86,7 @@ def combine_h5_dat(h5files, output, force, wipe_nonmonotonic_times=False):
                 mask[-1] = True
                 last_time = data[-1, 0]
                 for i in range(len(data) - 2, -1, -1):
-                    current_time = data[
-                        i, 0
-                    ]  # Assumes time is the first column
-                    # of the dat file
+                    current_time = data[i, 0]
                     if current_time < last_time:
                         mask[i] = True
                         last_time = current_time
@@ -112,13 +122,9 @@ def combine_h5_dat(h5files, output, force, wipe_nonmonotonic_times=False):
     help="Combined output filename.",
 )
 @click.option(
-    "--wipe-nonmonotonic-times",
-    "-w",
+    "--remove-overlapping-segments",
     is_flag=True,
-    help=(
-        "Wipe non-monotonic increasing times preserving later times from"
-        " h5 files."
-    ),
+    help="Sort h5 files by time and remove overlapping times",
 )
 @click.option(
     "--force",
@@ -131,7 +137,7 @@ def combine_h5_dat_command(**kwargs):
         kwargs["h5files"],
         kwargs["output"],
         kwargs["force"],
-        kwargs["wipe_nonmonotonic_times"],
+        kwargs["remover_overlapping_segments"],
     )
 
 
