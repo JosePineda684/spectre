@@ -62,11 +62,11 @@ def combine_h5_dat(h5files, output, force, remove_overlapping_segments):
                         else:
                             data_to_append = input[dat_file_key]
                         start_size = out[dat_file_key].shape[0]
-                        append_size = input[dat_file_key].shape[0]
+                        append_size = data_to_append.shape[0]
                         out[dat_file_key].resize(
                             start_size + append_size, axis=0
                         )
-                        out[dat_file_key][start_size:] = input[dat_file_key]
+                        out[dat_file_key][start_size:] = data_to_append
                     else:
                         logging.warning(
                             f"CombineH5Dat: Dat file '{dat_file_key}'"
