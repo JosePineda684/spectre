@@ -5,6 +5,8 @@
 
 #include <cstddef>
 
+#include "NumericalAlgorithms/Spectral/Parity.hpp"
+
 /// \cond
 class Matrix;
 template <size_t>
@@ -34,13 +36,20 @@ namespace filtering {
  * more coefficients). Setting \f$\alpha=36\f$ results in setting the highest
  * coefficient to machine precision, effectively zeroing it out.
  *
+ * For filtering the Fourier basis, both \f$\cos\f$ and \f$\sin\f$
+ * contributions to a given \f$m\f$-mode are equally weighted.
+ *
+ * The Parity argument is only used for ZernikeB1 bases, where the modal space
+ * is parity dependent.
+ *
  * \note The filter matrix is not cached by the function because it depends on a
  * double, an integer, and the mesh, which could make caching very memory
  * intensive. The caller of this function is responsible for determining whether
  * or not the matrix should be cached.
  */
 Matrix exponential_filter(const Mesh<1>& mesh, double alpha,
-                          unsigned half_power);
+                          unsigned half_power,
+                          Parity parity = Parity::Uninitialized);
 
 /*!
  * \brief Zeros the lowest `number_of_modes_to_zero` modal coefficients. Note
@@ -63,8 +72,12 @@ Matrix exponential_filter(const Mesh<1>& mesh, double alpha,
  *
  * where \f$k\f$ is the number of modes set to zero. The output \f$\bar{u}\f$ is
  * also in the *nodal* representation.
+ *
+ * The Parity argument is only used for ZernikeB1 bases, where the modal space
+ * is parity dependent.
  */
-const Matrix& zero_lowest_modes(const Mesh<1>& mesh,
-                                size_t number_of_modes_to_zero);
+const Matrix& zero_lowest_modes(
+    const Mesh<1>& mesh, size_t number_of_modes_to_zero,
+    Spectral::Parity parity = Spectral::Parity::Uninitialized);
 }  // namespace filtering
 }  // namespace Spectral
