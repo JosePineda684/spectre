@@ -144,7 +144,7 @@ Cce:
   #   BoundaryDataFilename: CceInputData.h5
   #   ExtractionRadius: 257
   BoundaryDataFilename: "{{ BondiSachsData }}"
-  ExtractionRadius: {{ ExtractionRadius }}
+  ExtractionRadius: Auto
   # How we interpolate the worldtube data in time for CCE.
   H5Interpolator:
     BarycentricRationalSpanInterpolator:

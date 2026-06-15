@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 CCE_INPUT_FILE_TEMPLATE = Path(__file__).parent / "Cce.yaml"
 
 
-# Use this to make sure segments are combined chronologically.
+# Helper function that extracts the segment number of a path as an integer.
+# Used to ensure segments are combined in the proper order.
 def segment_number(path):
     match = re.search(r"Segment_(\d+)", str(path))
     if match is None:
@@ -31,16 +32,19 @@ def cce_input(
     bondisachs_data: Optional[Union[str, Path]] = None,
     inspiral_run_dir: Optional[Union[str, Path]] = None,
     ringdown_run_dir: Optional[Union[str, Path]] = None,
-    extraction_radius: Optional[int] = None,
+    #    extraction_radius: Optional[int] = None,
 ) -> dict:
     """Generate the input for the CCE pipeline.
 
-    This input will be used to fill the 'CCE_INPUT_FILE_TEMPLATE'.
+    This input will be used to fill the '--cce-input-file-template'.
+    'inspiral_run_dir' and 'ringdown_run_dir' are passed for bookeeping reasons,
+    as the yaml only reads from 'bondisachs_data'.
 
     Arguments:
-        bondisachs_data: Path to the bondisachs data generated from a bbh sim
-        inspiral_run_dir: Directory of the inspiral run.
-        ringdown_run_dir: Directory of the ringdown run.
+        bondisachs_data: Path to the bondisachs data file generated from a bbh
+        simulation.
+        inspiral_run_dir: Directory containing the segments of the inspiral run.
+        ringdown_run_dir: Directory containing the segments of the ringdown run.
         extraction_radius: Extraction radius for CCE in units of the total mass.
     """
 
@@ -56,7 +60,7 @@ def cce_input(
             if ringdown_run_dir is not None
             else None
         ),
-        "ExtractionRadius": extraction_radius,
+        #     "ExtractionRadius": extraction_radius,
     }
 
 
@@ -73,19 +77,26 @@ def run_cce(
 ):
     """Extract partial or full waveforms from a simulation.
 
-    Point the inspiral_run_dir to the inspiral directory and ringdown_run_dir to
-    the ringdown directory for a given bbh simulation for a full waveform
-    extraction. For partial waveforms you can point bondisachs_data to the
-    BondiSachs file from a given segment in either directory. Specify
-    extraction_radius, otherwise the default of 200M is used. The remaining
-    options are forwarded to the 'schedule' command. See 'schedule' docs for
-    details.
+    Point the inspiral_run_dir and ringdown_run_dir to the directories
+    containing the segments of the inspiral and ringdown run, respectively, for
+    a given bbh simulation for a full waveform extraction. In this case, the
+    extraction radius, if left unspecified, will default to the largest radius
+    available. For partial waveforms you can point bondisachs_data to the
+    BondiSachs file from a given segment in either directory. Here, it's
+    important that the filename of the BondiSachs data is in the form
+    NameOfFileRXXXX.h5 The remaining options are forwarded to the 'schedule'
+    command. See 'schedule' docs for details.
 
     Arguments:
         bondisachs_data: Path to the bondisachs data generated from a bbh run.
-        inspiral_run_dir: Directory of the inspiral run.
-        ringdown_run_dir: Directory of the ringdown run.
+        inspiral_run_dir: Directory containing the segments of the inspiral run.
+        ringdown_run_dir: Directory containing the segments of the ringdown run.
         extraction_radius: Extraction radius for CCE in units of the total mass.
+        Specifying this option is only valid when pointing into a directory with
+        multiple BondiSachs files. Left unspecified, the default will be the
+        largest radius available. When pointing to a single file, the file must
+        be in the form NameOfFileRXXXX.h5, where the last 4 digits are the
+        extraction radius.
         pipeline_dir: Directory where steps in the pipeline are created. If not
         specified, a temporary directory is used that is deleted after the
         pipeline finishes.
@@ -95,8 +106,8 @@ def run_cce(
         yaml file that defines the steps in the CCE pipeline.
     """
     logger.warning(
-        "The BBH pipeline is still experimental. Please review the "
-        " generated input files."
+        "The BBH pipeline is still experimental. Please review the generated"
+        " input files."
     )
 
     # Resolve directories
@@ -127,31 +138,23 @@ def run_cce(
     elif bondisachs_data and not any([inspiral_run_dir, ringdown_run_dir]):
         bondisachs_data = str(Path(bondisachs_data).resolve())
         match = re.search(r"R(\d{4})\.h5$", bondisachs_data)
-        if match and bondisachs_data and extraction_radius:
-            if int(match.group(1)) != extraction_radius:
-                raise ValueError(
-                    "The extraction radius specified does not match the"
-                    " extraction radius in the bondisachs_data filename."
-                )
-        elif not match and not extraction_radius:
+        if not match:
             raise ValueError(
-                "The provided bondisachs_data does not end with"
-                " 'RXXXX.h5', and no extraction radius is specified. Either"
-                " specify the extraction radius, or modify the bondisachs_data"
-                " filename to include the extraction radius in the format"
-                " 'RXXXX.h5'. For example, if the extraction radius is 200, the"
-                " path should end with 'R0200.h5'."
+                "The provided bondisachs_data does not end with 'RXXXX.h5'."
+                " Modify the bondisachs_data filename to include the extraction"
+                " radius in the format 'NameOfFileRXXXX.h5'. For example, if"
+                " the extraction radius is 200, the filename should end with"
+                " 'R0200.h5'."
             )
-        elif match and bondisachs_data and not extraction_radius:
-            extraction_radius = int(match.group(1))
-
+        elif match and bondisachs_data and extraction_radius:
+            raise ValueError("")
     elif not bondisachs_data and any([inspiral_run_dir, ringdown_run_dir]):
-        logger.warning(
+        logger.info(
             "No Bondi-Sachs data provided. Combining provided inspiral and"
             " ringdown directories to combine Bondi-Sachs data for CCE with"
             " extraction radius specified. If no extraction radius is"
-            " specified, the default of 200 will be used. This can take a"
-            " couple minutes."
+            " specified, the largest radius available will be used. This can"
+            " take a couple minutes."
         )
         if not extraction_radius:
             extraction_radius = 200  # Somewhat arbitrary default.
@@ -164,7 +167,7 @@ def run_cce(
                 key=segment_number,
             )
         elif not inspiral_run_dir:
-            logger.warning(
+            logger.info(
                 "No inspiral run directory provided. Only ringdown data will be"
                 " used to generate Bondi-Sachs data for CCE."
             )
@@ -177,7 +180,7 @@ def run_cce(
                 key=segment_number,
             )
         elif not ringdown_run_dir:
-            logger.warning(
+            logger.info(
                 "No ringdown run directory provided. Only inspiral data will be"
                 " used to generate Bondi-Sachs data for CCE."
             )
@@ -264,11 +267,12 @@ def run_cce(
         path_type=Path,
     ),
     help=(
-        "Path to the Bondi-Sachs data generated from a bbh inspiral or"
-        " ringdown. This can be combined for a complete wave form, or just from"
-        " the provided directories. If you specify path to Bondi-Sachs data,"
-        " do not specify inspiral or ringdown run directories, as these are"
-        " used to generate the Bondi-Sachs data for CCE."
+        "Path to the an individual Bondi-Sachs data file of the form "
+        " 'NameOfFileRXXXX.h5'. This can be combined file for a complete"
+        " waveform, or, for a partial waveform, an individual Bondi-Sachs file"
+        " from a segment directory. If you specify path to Bondi-Sachs data, do"
+        " not specify inspiral or ringdown run directories, as these are used"
+        " to generate the Bondi-Sachs data for CCE."
     ),
 )
 @click.option(
@@ -300,6 +304,7 @@ def run_cce(
 )
 @click.option(
     "--extraction-radius",
+    "--exr",
     type=click.IntRange(1, 1000),  # Radius should be positive and generally
     # not larger than 1000M, but we can adjust this if needed.
     help=(
