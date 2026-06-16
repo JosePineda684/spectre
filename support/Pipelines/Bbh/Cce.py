@@ -32,7 +32,6 @@ def cce_input(
     bondisachs_data: Optional[Union[str, Path]] = None,
     inspiral_run_dir: Optional[Union[str, Path]] = None,
     ringdown_run_dir: Optional[Union[str, Path]] = None,
-    #    extraction_radius: Optional[int] = None,
 ) -> dict:
     """Generate the input for the CCE pipeline.
 
@@ -45,7 +44,6 @@ def cce_input(
         simulation.
         inspiral_run_dir: Directory containing the segments of the inspiral run.
         ringdown_run_dir: Directory containing the segments of the ringdown run.
-        extraction_radius: Extraction radius for CCE in units of the total mass.
     """
 
     return {
@@ -60,7 +58,6 @@ def cce_input(
             if ringdown_run_dir is not None
             else None
         ),
-        #     "ExtractionRadius": extraction_radius,
     }
 
 
@@ -92,10 +89,10 @@ def run_cce(
         inspiral_run_dir: Directory containing the segments of the inspiral run.
         ringdown_run_dir: Directory containing the segments of the ringdown run.
         extraction_radius: Extraction radius for CCE in units of the total mass.
-        Specifying this option is only valid when pointing into a directory with
-        multiple BondiSachs files. Left unspecified, the default will be the
-        largest radius available. When pointing to a single file, the file must
-        be in the form NameOfFileRXXXX.h5, where the last 4 digits are the
+        Specifying this option is only necessary when pointing into a directory
+        with multiple BondiSachs files. Left unspecified, the default will be
+        the largest radius available. When pointing to a single file, the file
+        must be in the form NameOfFileRXXXX.h5, where the last 4 digits are the
         extraction radius.
         pipeline_dir: Directory where steps in the pipeline are created. If not
         specified, a temporary directory is used that is deleted after the
@@ -147,17 +144,39 @@ def run_cce(
                 " 'R0200.h5'."
             )
         elif match and bondisachs_data and extraction_radius:
-            raise ValueError("")
+            raise ValueError(
+                "When pointing to an individual BondiSachs data file, do not"
+                " specify extraction radius as an option"
+            )
+        extraction_radius = int(match.group(1))
     elif not bondisachs_data and any([inspiral_run_dir, ringdown_run_dir]):
         logger.info(
             "No Bondi-Sachs data provided. Combining provided inspiral and"
-            " ringdown directories to combine Bondi-Sachs data for CCE with"
-            " extraction radius specified. If no extraction radius is"
+            " ringdown segements to generate single Bondi-Sachs data file for"
+            " CCE with extraction radius specified. If no extraction radius is"
             " specified, the largest radius available will be used. This can"
             " take a couple minutes."
         )
         if not extraction_radius:
-            extraction_radius = 200  # Somewhat arbitrary default.
+            # Grab different BondiSachs radii and save largest. Assuming radii
+            # across inspiral and ringdown segments are all the same.
+            extraction_radii_files = []
+            if inspiral_run_dir:
+                extraction_radii_files = sorted(
+                    # These globs currently include BbhReduction files, but that
+                    # gets ingnored in the for loop.
+                    Path(inspiral_run_dir).glob(f"Segment_*/*R*.h5")
+                )
+            if ringdown_run_dir:
+                extraction_radii_files += sorted(
+                    Path(ringdown_run_dir).glob(f"Segment_*/*R*.h5")
+                )
+            extraction_radii = []
+            for file in extraction_radii_files:
+                # Returns None for filenames with incorrect formatting.
+                match = re.search(r"R(\d{4})\.h5$", str(Path(file).resolve()))
+                extraction_radii.append(int(match.group(1)))
+            extraction_radius = np.max(extraction_radii)
         inspiral_bondi_sachs_data = []
         if inspiral_run_dir:
             inspiral_bondi_sachs_data = sorted(
@@ -212,7 +231,6 @@ def run_cce(
         bondisachs_data=bondisachs_data,
         inspiral_run_dir=inspiral_run_dir,
         ringdown_run_dir=ringdown_run_dir,
-        extraction_radius=extraction_radius,
     )
 
     cce_params["BondiSachsData"] = bondisachs_data
@@ -226,7 +244,6 @@ def run_cce(
         if ringdown_run_dir is not None
         else None
     )
-    cce_params["ExtractionRadius"] = extraction_radius
 
     # Determine resource allocation
     if (
@@ -308,10 +325,11 @@ def run_cce(
     type=click.IntRange(1, 1000),  # Radius should be positive and generally
     # not larger than 1000M, but we can adjust this if needed.
     help=(
-        "Extraction radius for CCE in units of the total mass. Typical"
-        " extraction radii for SpECTRE runs are [100, 150, 200]. "
+        "Extraction radius for CCE in units of the total mass. This option"
+        " should only be specified when pointing to a directory with multiple"
+        " BondiSachs files at different extraction radii. Defaults to the"
+        " largest extraction radius available. "
     ),
-    show_default=True,
 )
 @click.option(
     "--cce-input-file-template",

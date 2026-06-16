@@ -9,7 +9,6 @@ Testing:
 BondiSachsData: {{ BondiSachsData }}
 InspiralRunDirectory: {{ InspiralRunDirectory | default("") }}
 RingdownRunDirectory: {{ RingdownRunDirectory | default("") }}
-ExtractionRadius: {{ ExtractionRadius }}
 
 ---
 
