@@ -973,6 +973,24 @@ void test_bondi_worldtube_buffer_updater(const gsl::not_null<Generator*> gen) {
         gen, extraction_radius_in_filename, time_varies_fastest);
   }
 }
+
+template <typename T>
+void test_metric_worldtube_buffer_updater_rejects_non_increasing_times() {
+  const std::string filename = "BoundaryDataH5TestNonIncreasingTimes.h5";
+  const size_t l_max = 1;
+  const ComplexModalVector lapse_modes{square(l_max + 1)};
+  const auto write_lapse_data = [&filename, &lapse_modes,
+                                 l_max](const std::vector<double>& times) {
+    if (file_system::check_if_file_exists(filename)) {
+      file_system::rm(filename, true);
+    }
+    Cce::TestHelpers::WorldtubeModeRecorder recorder{l_max, filename};
+    for (const double time : times) {
+      recorder.append_worldtube_mode_data("/Lapse", time, lapse_modes);
+    }
+  };
+}
+
 }  // namespace
 
 // An increased timeout because this test seems to have high variance in
