@@ -34,8 +34,7 @@ TargetParams = Literal[
     "AdmAngularMomentumZ",
     "Eccentricity",
     "EccentricityAbsoluteTolerance",
-    "MaxEccIterations"
-    "MeanAnomalyFraction",
+    "MaxEccIterationsMeanAnomalyFraction",
     "NumOrbits",
     "TimeToMerger",
     "EvolutionLev",

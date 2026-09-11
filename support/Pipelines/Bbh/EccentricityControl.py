@@ -104,9 +104,7 @@ def eccentricity_control(
         "For eccentricity control the target eccentricity and its tolerance"
         " must be set."
     )
-    assert (
-        EccIteration.current
-    )
+    assert EccIteration.current
 
     # Find the current eccentricity and determine new parameters to put into
     # generate-id
