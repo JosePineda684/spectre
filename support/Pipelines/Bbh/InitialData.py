@@ -34,6 +34,7 @@ TargetParams = Literal[
     "AdmAngularMomentumZ",
     "Eccentricity",
     "EccentricityAbsoluteTolerance",
+    "MaxEccIterations"
     "MeanAnomalyFraction",
     "NumOrbits",
     "TimeToMerger",
@@ -42,6 +43,7 @@ TargetParams = Literal[
 
 DEFAULT_TARGET_PARAMS: Dict[TargetParams, float] = {
     "EccentricityAbsoluteTolerance": 1e-3,
+    "MaxEccIterations": 7,
 }
 
 
@@ -448,6 +450,16 @@ def generate_id(
     help="Absolute tolerance for eccentricity control.",
 )
 @click.option(
+    "--max-ecc-its",
+    type=int,
+    default=DEFAULT_TARGET_PARAMS["MaxEccIterations"],
+    show_default=True,
+    help=(
+        "Maximum number of iterations to perform eccentricity reduction before"
+        " exiting control loop."
+    ),
+)
+@click.option(
     "--mean-anomaly-fraction",
     "-l",
     type=click.FloatRange(0.0, 1.0, max_open=True),
@@ -584,6 +596,7 @@ def generate_id_command(
         "DimensionlessSpinB": dimensionless_spin_b,
         "Eccentricity": eccentricity,
         "EccentricityAbsoluteTolerance": eccentricity_abs_tol,
+        "MaxEccIterations": max_ecc_its,
         "MeanAnomalyFraction": mean_anomaly_fraction,
         "NumOrbits": num_orbits,
         "TimeToMerger": time_to_merger,

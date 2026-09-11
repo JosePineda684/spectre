@@ -14,6 +14,9 @@ from spectre.Pipelines.Bbh.Inspiral import (
     INSPIRAL_INPUT_FILE_TEMPLATE,
     start_inspiral,
 )
+from spectre.Pipelines.EccentricityControl.DirectoryStructure import (
+    EccIteration,
+)
 from spectre.Pipelines.EccentricityControl.EccentricityControlParams import (
     eccentricity_control_params,
     eccentricity_control_params_options,
@@ -100,6 +103,9 @@ def eccentricity_control(
     ), (
         "For eccentricity control the target eccentricity and its tolerance"
         " must be set."
+    )
+    assert (
+        EccIteration.current
     )
 
     # Find the current eccentricity and determine new parameters to put into
