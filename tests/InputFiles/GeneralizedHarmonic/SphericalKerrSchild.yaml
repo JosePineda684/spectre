@@ -1,0 +1,270 @@
+# Spherical Kerr-Schild single-black-hole evolution.
+# This is the SpECTRE analogue of the static single-BH SpEC setup.
+
+Executable: EvolveGhSingleBlackHole
+Testing:
+  Check: parse;execute_check_output
+
+---
+
+Parallelization:
+  ElementDistribution: NumGridPointsAndGridSpacing
+
+ResourceInfo:
+  AvoidGlobalProc0: false
+  Singletons: Auto
+
+Evolution:
+  InitialTime: 0.0
+  InitialTimeStep: 0.0002
+  MinimumTimeStep: 1.e-7
+  InitialSlabSize: 0.1
+  LocalTimeStepping: Conservative
+  VariableOrderAlgorithm:
+    GoalOrder: 4
+  LtsStepChoosers:
+    - LimitIncrease:
+        Factor: 2
+    - ElementSizeCfl:
+        SafetyFactor: 0.5
+    - ErrorControl:
+        AbsoluteTolerance: 1.e-10
+        RelativeTolerance: 1.e-8
+        MaxFactor: 2
+        MinFactor: 0.25
+        SafetyFactor: 0.95
+  TimeStepper:
+    AdamsBashforth:
+      Order: 4
+
+Amr:
+  Criteria:
+  EnableInBlocks: All
+  Policies:
+    EnforceTwoToOneBalanceInNormalDirection: true
+    Isotropy: Anisotropic
+    Limits:
+      RefinementLevel: Auto
+      NumGridPoints: Auto
+      ErrorBeyondLimits: false
+    AllowCoarsening: true
+  Verbosity: Quiet
+
+PhaseChangeAndTriggers:
+  - Trigger:
+      Slabs:
+        EvenlySpaced:
+          Interval: 100
+          Offset: 0
+    PhaseChanges:
+      - CheckpointAndExitAfterWallclock:
+          WallclockHours: None
+
+InitialData: &InitialData
+  GeneralizedHarmonic(SphericalKerrSchild):
+    Mass: 1.0
+    Spin: [0.0, 0.0, 0.99]
+    Center: &Center [0.0, 0.0, 0.0]
+
+DomainCreator:
+  Sphere:
+    # Spherical-Kerr-Schild r-coordinate.  For chi=0.99,
+    # r_minus=0.8589322 and r_plus=1.1410678.
+    InnerRadius: &InnerRadius 1.0
+    OuterRadius: 400.0
+    Interior:
+      ExciseWithBoundaryCondition:
+        DirichletAnalytic:
+          AnalyticPrescription: *InitialData
+    InitialRefinement: 0
+    # [phi, theta, r], corresponding approximately to SpEC Nr=8, L=6.
+    InitialGridPoints: [7, 7, 8]
+    UseEquiangularMap: true
+    EquatorialCompression: None
+    # Reproduce the SpEC Rmid=10 two-shell layout.
+    RadialPartitioning: [10.0]
+    RadialDistribution: [Linear, Linear]
+    WhichWedges: All
+    TimeDependentMaps: None
+    OuterBoundaryCondition:
+      DirichletAnalytic:
+        AnalyticPrescription: *InitialData
+
+EvolutionSystem:
+  GeneralizedHarmonic:
+    GaugeCondition:
+      AnalyticChristoffel:
+        AnalyticPrescription: *InitialData
+    DampingFunctionGamma0:
+      GaussianPlusConstant:
+        Constant: 0.001
+        Amplitude: 3.0
+        Width: 11.313708499
+        Center: [0.0, 0.0, 0.0]
+    DampingFunctionGamma1:
+      GaussianPlusConstant:
+        Constant: -1.0
+        Amplitude: 0.0
+        Width: 11.313708499
+        Center: [0.0, 0.0, 0.0]
+    DampingFunctionGamma2:
+      GaussianPlusConstant:
+        Constant: 0.001
+        Amplitude: 1.0
+        Width: 11.313708499
+        Center: [0.0, 0.0, 0.0]
+
+SpatialDiscretization:
+  BoundaryCorrection:
+    AveragedUpwindPenalty:
+  DiscontinuousGalerkin:
+    Formulation: StrongInertial
+    Quadrature: GaussLobatto
+    Filtering:
+      - Hypercube:
+          HalfPower: 64
+          Enable: true
+          BlocksToFilter: All
+          VolumeFilterOnSubstep: true
+          BoundaryCorrectionFilterOnSubstep: false
+          VolumeFilterEveryNSteps: None
+          BoundaryCorrectionFilterEveryNSteps: None
+
+EventsAndTriggersAtCheckpoints:
+
+EventsAndTriggersAtSlabs:
+  - Trigger:
+      Slabs:
+        EvenlySpaced:
+          Interval: 10
+          Offset: 0
+    Events:
+      - ObserveTimeStep:
+          SubfileName: TimeSteps
+          PrintTimeToTerminal: true
+          ObservePerCore: false
+      - ObserveNorms:
+          SubfileName: Norms
+          TensorsToObserve:
+            - Name: Lapse
+              NormType: L2Norm
+              Components: Individual
+            - Name: PointwiseL2Norm(GaugeConstraint)
+              NormType: L2Norm
+              Components: Sum
+            - Name: PointwiseL2Norm(ThreeIndexConstraint)
+              NormType: L2Norm
+              Components: Sum
+            - Name: PointwiseL2Norm(FourIndexConstraint)
+              NormType: L2Norm
+              Components: Sum
+  - Trigger:
+      Slabs:
+        EvenlySpaced:
+          Interval: 20
+          Offset: 0
+    Events:
+      - ObserveFields:
+          SubfileName: VolumeData
+          VariablesToObserve:
+            - SpacetimeMetric
+            - Pi
+            - Phi
+            - GaugeH
+            - PointwiseL2Norm(GaugeConstraint)
+            - PointwiseL2Norm(ThreeIndexConstraint)
+            - PointwiseL2Norm(FourIndexConstraint)
+          InterpolateToMesh: None
+          ProjectToMesh: None
+          CoordinatesFloatingPointType: Double
+          FloatingPointTypes: [Double]
+          BlocksToObserve: All
+  - Trigger:
+      Slabs:
+        EvenlySpaced:
+          Interval: 10
+          Offset: 0
+    Events:
+      - ApparentHorizon
+      - ExcisionBoundary
+  - Trigger:
+      Slabs:
+        Specified:
+          Values: [2.0]
+    Events:
+      - Completion
+
+EventsAndTriggersAtSteps:
+
+EventsAndDenseTriggers:
+
+EventsRunAtCleanup:
+  ObservationValue: -1000.0
+  Events:
+    - ObserveTimeStepVolume:
+        SubfileName: FailureTimeStep
+        FloatingPointType: Double
+        CoordinatesFloatingPointType: Float
+
+Observers:
+  VolumeFileName: "GhSphericalKerrSchildVolume"
+  ReductionFileName: "GhSphericalKerrSchildReductions"
+  SurfaceFileName: "GhSphericalKerrSchildSurfaces"
+
+Interpolator:
+  Verbosity: Silent
+
+ApparentHorizons:
+  # The initial SphKS horizon is a sphere, but leave room for shape changes.
+  LMax: 20
+  ApparentHorizon: &Ah
+    Criteria:
+      - Residual:
+          MinResidual: 1.e-2
+          MaxResidual: 1.e-1
+          MinResolutionL: 4
+    InitialGuess:
+      InitialL: &LMax 8
+      InitialShape:
+        Sphere:
+          Radius: 1.1410678
+          Center: *Center
+    FastFlow:
+      Flow: Fast
+      Alpha: 1.0
+      Beta: 0.5
+      AbsTol: 1.e-12
+      TruncationTol: 1.e-2
+      DivergenceTol: 1.2
+      DivergenceIter: 5
+      MaxIts: 100
+    Verbosity: Verbose
+    MaxComputeCoordsRetries: 3
+    BlocksForHorizonFind: All
+  ControlSystemSingleAh: *Ah
+  ControlSystemCharSpeedAh: *Ah
+
+InterpolationTargets:
+  BondiSachsInterpolation:
+    LMax: 16
+    Radius: [100, 150, 200]
+    Center: [0, 0, 0]
+    AngularOrdering: Cce
+  ExcisionBoundary: &ExBdry
+    LMax: *LMax
+    Center: *Center
+    Radius: *InnerRadius
+    AngularOrdering: Strahlkorper
+  ControlSystemCharSpeedExcision: *ExBdry
+
+Cce:
+  BondiSachsOutputFilePrefix: "BondiSachs"
+
+ControlSystems:
+  WriteDataToDisk: true
+  MeasurementsPerUpdate: 4
+  DelayUpdate: true
+  Verbosity: Silent
+  Translation: None
+  Shape: None
+  Size: None

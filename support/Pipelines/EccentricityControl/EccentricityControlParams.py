@@ -91,7 +91,7 @@ def eccentricity_control_params(
     # Import functions from SpEC until we have ported them over
     check_spec_import(
         contains_commit="ecfabf1ce78daeacbdd026625a02215c8e84af0e",
-    )
+        )
     from OmegaDotEccRemoval import (
         ComputeOmegaAndDerivsFromFile,
         FindTmin,

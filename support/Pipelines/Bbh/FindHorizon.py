@@ -411,7 +411,6 @@ def use_excision_as_horizon(
 )
 @click.option(
     "--l-max",
-    "-l",
     type=int,
     required=True,
     help="Max l-mode for the horizon search.",
