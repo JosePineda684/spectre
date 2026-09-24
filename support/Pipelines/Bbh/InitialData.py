@@ -34,6 +34,7 @@ TargetParams = Literal[
     "AdmAngularMomentumZ",
     "Eccentricity",
     "EccentricityAbsoluteTolerance",
+    "EccentricityMaxIts",
     "MeanAnomalyFraction",
     "NumOrbits",
     "TimeToMerger",
@@ -42,6 +43,7 @@ TargetParams = Literal[
 
 DEFAULT_TARGET_PARAMS: Dict[TargetParams, float] = {
     "EccentricityAbsoluteTolerance": 1e-3,
+    "EccentricityMaxIts": 7,
 }
 
 
@@ -446,6 +448,13 @@ def generate_id(
     default=DEFAULT_TARGET_PARAMS["EccentricityAbsoluteTolerance"],
     show_default=True,
     help="Absolute tolerance for eccentricity control.",
+)
+@click.option(
+    "--eccentricity-max-its",
+    type=int,
+    default=DEFAULT_TARGET_PARAMS["EccentricityMaxIterations"],
+    show_default=True,
+    help="Maximum number of iterations for eccentricity control.",
 )
 @click.option(
     "--mean-anomaly-fraction",
