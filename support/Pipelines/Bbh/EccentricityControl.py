@@ -14,6 +14,9 @@ from spectre.Pipelines.Bbh.Inspiral import (
     INSPIRAL_INPUT_FILE_TEMPLATE,
     start_inspiral,
 )
+from spectre.Pipelines.EccentricityControl.DirectoryStructure import (
+    EccIteration,
+)
 from spectre.Pipelines.EccentricityControl.EccentricityControlParams import (
     eccentricity_control_params,
     eccentricity_control_params_options,
@@ -94,12 +97,23 @@ def eccentricity_control(
     with open(id_input_file_path, "r") as open_input_file:
         id_metadata, id_input_file = yaml.safe_load_all(open_input_file)
     target_params = id_metadata["TargetParams"]
-    assert (
-        target_params["Eccentricity"] is not None
-        and target_params["EccentricityAbsoluteTolerance"] is not None
+    assert all(
+        target_params[key] is not None
+        for key in [
+            "Eccentricity",
+            "EccentricityAbsoluteTolerance",
+            "MaxEccIterations",
+        ]
     ), (
-        "For eccentricity control the target eccentricity and its tolerance"
-        " must be set."
+        "For eccentricity control the target eccentricity, its tolerance, and"
+        " maximum number of iterations must be set."
+    )
+    assert (
+        EccIteration.current(pipeline_dir).id
+        < target_params["MaxEccIterations"]
+    ), (
+        "Maximum number of iterations in Eccentricity control loop reached."
+        " Printing full iteration history now:"
     )
 
     # Find the current eccentricity and determine new parameters to put into
