@@ -26,6 +26,17 @@ from spectre.support.Schedule import scheduler_options
 logger = logging.getLogger(__name__)
 
 
+def _load_ecc_history(pipeline_dir):
+    output = []
+    for lev_dir in Path(pipeline_dir).glob("Ecc*/Lev*/*Inspiral"):
+        ecc_params_yaml = lev_dir / "EccentricityParams.yaml"
+
+        if ecc_params_yaml.is_file():
+            output.append(f"===== {ecc_params_yaml} =====")
+            output.append(ecc_params_yaml.read_text())
+    return "\n".join(output)
+
+
 def eccentricity_control(
     h5_files: Union[Union[str, Path], Sequence[Union[str, Path]]],
     id_input_file_path: Union[str, Path],
@@ -102,7 +113,7 @@ def eccentricity_control(
         for key in [
             "Eccentricity",
             "EccentricityAbsoluteTolerance",
-            "MaxEccIterations",
+            "EccentricityMaxIterations",
         ]
     ), (
         "For eccentricity control the target eccentricity, its tolerance, and"
@@ -110,10 +121,11 @@ def eccentricity_control(
     )
     assert (
         EccIteration.current(pipeline_dir).id
-        < target_params["MaxEccIterations"]
+        >= target_params["EccentricityMaxIterations"]
     ), (
         "Maximum number of iterations in Eccentricity control loop reached."
-        " Printing full iteration history now:"
+        " Printing full iteration history now:\n"
+        + _load_ecc_history(pipeline_dir)
     )
 
     # Find the current eccentricity and determine new parameters to put into

@@ -34,7 +34,7 @@ TargetParams = Literal[
     "AdmAngularMomentumZ",
     "Eccentricity",
     "EccentricityAbsoluteTolerance",
-    "EccentricityMaxIts",
+    "EccentricityMaxIterations",
     "MeanAnomalyFraction",
     "NumOrbits",
     "TimeToMerger",
@@ -43,7 +43,7 @@ TargetParams = Literal[
 
 DEFAULT_TARGET_PARAMS: Dict[TargetParams, float] = {
     "EccentricityAbsoluteTolerance": 1e-3,
-    "EccentricityMaxIts": 7,
+    "EccentricityMaxIterations": 7,
 }
 
 
